@@ -32,6 +32,7 @@ flutter:
     - assets/splash.png
     - assets/1024.png
     - assets/hassan.jpg
+    - assets/amd.jpg
 
 
 flutter_icons:

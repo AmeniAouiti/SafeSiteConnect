@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../../navigation/route.dart'; // Assure-toi que le chemin d'accès est correct
 
@@ -207,6 +206,24 @@ class SignInScreenState extends State<SignInScreen> {
             ),
             const SizedBox(height: 20),
             _buildSignInButton(),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  // Utilise la route nommée pour AdminDashboard
+                  Navigator.pushNamed(context, AppRoutes.adminDashboard);
+                },
+                child: Text(
+                  'Accéder à l\'espace admin',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 16),
             _buildDivider(),
             const SizedBox(height: 16),
