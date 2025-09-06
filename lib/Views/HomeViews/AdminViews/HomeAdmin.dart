@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'CustomBottomNavigationBarAdmin.dart';
+import 'admin_profile_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -112,10 +113,9 @@ class _AdminDashboardState extends State<AdminDashboard> with TickerProviderStat
       actions: [
         GestureDetector(
           onTap: () {
-            // Navigation vers le profil administrateur
-            // Navigator.of(context).push(
-            //   MaterialPageRoute(builder: (context) => const AdminProfileScreen()),
-            // );
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const AdminProfileScreen()),
+            );
           },
           child: Container(
             margin: const EdgeInsets.only(right: 16),

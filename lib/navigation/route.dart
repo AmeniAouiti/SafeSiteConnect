@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:safesiteconnect/Views/HomeViews/AdminViews/PointageEmployScreen.dart';
+import 'package:safesiteconnect/Views/HomeViews/AdminViews/TacheEmployScreen.dart';
 import 'package:safesiteconnect/Views/HomeViews/EmployeeSpace/PageAlertes.dart';
 import 'package:safesiteconnect/Views/HomeViews/EmployeeSpace/ProfilEmployePage.dart';
 import 'package:safesiteconnect/Views/authView/VerifyOtpScreen.dart';
@@ -22,9 +24,11 @@ class AppRoutes {
   static const String alert = '/alert';
   static const String profile = '/profile';
   static const String verifyOtp = '/verifyOtp';
-  static const String adminDashboard = '/adminDashboard';
+  static const String adminDashboard = '/dashboard';
   static const String usersScreen = '/user_management';
   static const String incident_management = '/incident_management';
+  static const String task_management = '/task_management';
+  static const String attendance_tracking = '/attendance_tracking';
 
 
 
@@ -54,6 +58,10 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const UsersScreen());
       case incident_management:
         return MaterialPageRoute(builder: (_) => const IncidentScreen());
+      case task_management:
+        return MaterialPageRoute(builder: (_) => const TacheEmployScreen());
+      case attendance_tracking:
+        return MaterialPageRoute(builder: (_) => const PointageEmployScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(
