@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../navigation/route.dart'; // adapte le chemin
+import 'package:provider/provider.dart';
+import '../../ViewsModels/auth_viewmodel.dart';
+import '../../navigation/route.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -15,12 +17,24 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isButtonEnabled = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
     _passwordController.addListener(_validateForm);
     _confirmPasswordController.addListener(_validateForm);
+
+    // Récupérer userId depuis les arguments
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _userId = ModalRoute.of(context)?.settings.arguments as String?;
+      if (_userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur: ID utilisateur manquant')),
+        );
+        Navigator.pop(context);
+      }
+    });
   }
 
   void _validateForm() {
@@ -39,27 +53,85 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: SizedBox(
-        height: MediaQuery.of(context).size.height,
-        width: MediaQuery.of(context).size.width,
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF005B96),
-                Color(0xFFE8F5E8),
-                Color(0xFFF0F0F0),
-              ],
-              stops: [0.0, 0.5, 1.0],
+  Future<void> _handleResetPassword() async {
+    if (_formKey.currentState!.validate() && _userId != null) {
+      final viewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+      // Afficher snackbar de chargement
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              SizedBox(width: 16),
+              Text('Changement du mot de passe...'),
+            ],
+          ),
+          backgroundColor: Color(0xFF7ED957),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      final success = await viewModel.resetPassword(_userId!, _passwordController.text);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (viewModel.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(viewModel.errorMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
             ),
           ),
-          child: SafeArea(
+        );
+      } else if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mot de passe changé avec succès !'),
+            backgroundColor: Color(0xFF7ED957),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Délai pour UX
+        await Future.delayed(const Duration(milliseconds: 1000));
+        Navigator.pushReplacementNamed(context, AppRoutes.signIn);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = Provider.of<AuthViewModel>(context);
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            height: MediaQuery.of(context).size.height,
+            width: MediaQuery.of(context).size.width,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF005B96),
+                  Color(0xFFE8F5E8),
+                  Color(0xFFF0F0F0),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+
+          // Content
+          SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: SingleChildScrollView(
@@ -70,14 +142,41 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     const SizedBox(height: 30),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 400),
-                      child: _buildForm(context),
+                      child: _buildForm(context, viewModel),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
-        ),
+
+          // Loading overlay
+          if (viewModel.isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.6),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Color(0xFF7ED957),
+                      strokeWidth: 4,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Changement du mot de passe...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -149,7 +248,8 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Entrez votre nouveau mot de passe',
+          'Créez un nouveau mot de passe sécurisé',
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
             color: Colors.white.withOpacity(0.9),
@@ -160,9 +260,9 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildForm(BuildContext context) {
+  Widget _buildForm(BuildContext context, AuthViewModel viewModel) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -187,10 +287,10 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
             _buildPasswordField(),
             const SizedBox(height: 16),
             _buildConfirmPasswordField(),
+            const SizedBox(height: 24),
+            _buildChangePasswordButton(viewModel),
             const SizedBox(height: 20),
-            _buildChangePasswordButton(),
-            const SizedBox(height: 16),
-            _buildBackToSignInButton(),
+            _buildBackToSignInButton(context),
           ],
         ),
       ),
@@ -269,10 +369,10 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
           filled: true,
           fillColor: Colors.transparent,
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
         obscureText: !_isPasswordVisible,
+        textInputAction: TextInputAction.next,
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Veuillez entrer un mot de passe';
@@ -358,10 +458,11 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
           filled: true,
           fillColor: Colors.transparent,
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
         obscureText: !_isConfirmPasswordVisible,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) => _handleResetPassword(),
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Veuillez confirmer le mot de passe';
@@ -375,11 +476,13 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildChangePasswordButton() {
+  Widget _buildChangePasswordButton(AuthViewModel viewModel) {
+    final isEnabled = _isButtonEnabled && !viewModel.isLoading && _userId != null;
+
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        gradient: _isButtonEnabled
+        gradient: isEnabled
             ? const LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
@@ -397,7 +500,7 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: _isButtonEnabled
+        boxShadow: isEnabled
             ? [
           BoxShadow(
             color: const Color(0xFF7ED957).withOpacity(0.3),
@@ -408,15 +511,7 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
             : null,
       ),
       child: ElevatedButton(
-        onPressed: _isButtonEnabled
-            ? () {
-          if (_formKey.currentState!.validate()) {
-            // TODO : Logique changement mot de passe
-            // Puis retour à la connexion avec route nommée :
-            Navigator.pushReplacementNamed(context, AppRoutes.signIn);
-          }
-        }
-            : null,
+        onPressed: isEnabled ? _handleResetPassword : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
@@ -425,7 +520,16 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: const Text(
+        child: viewModel.isLoading
+            ? const SizedBox(
+          height: 20,
+          width: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
+            : const Text(
           'Changer le mot de passe',
           style: TextStyle(
             fontSize: 16,
@@ -437,7 +541,7 @@ class ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildBackToSignInButton() {
+  Widget _buildBackToSignInButton(BuildContext context) {
     return Container(
       height: 50,
       decoration: BoxDecoration(

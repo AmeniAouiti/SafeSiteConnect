@@ -3,16 +3,18 @@ import 'package:safesiteconnect/Views/HomeViews/AdminViews/PointageEmployScreen.
 import 'package:safesiteconnect/Views/HomeViews/AdminViews/TacheEmployScreen.dart';
 import 'package:safesiteconnect/Views/HomeViews/EmployeeSpace/PageAlertes.dart';
 import 'package:safesiteconnect/Views/HomeViews/EmployeeSpace/ProfilEmployePage.dart';
-import 'package:safesiteconnect/Views/authView/VerifyOtpScreen.dart';
+// CORRECTION : Importez le bon fichier
 import '../Views/HomeViews/AdminViews/HomeAdmin.dart';
 import '../Views/HomeViews/AdminViews/IncidentScreen.dart';
 import '../Views/HomeViews/AdminViews/UsersScreen.dart';
 import '../Views/HomeViews/EmployeeSpace/HomeEmployee.dart';
 import '../Views/HomeViews/EmployeeSpace/PointageScreen.dart';
 import '../Views/HomeViews/EmployeeSpace/taskScreen.dart';
+import '../Views/authView/ChangePasswordScreen.dart';
 import '../Views/authView/ForgotPasswordScreen.dart';
 import '../Views/authView/SignInScreen.dart';
 import '../Views/authView/SignUpScreen.dart';
+import '../Views/authView/VerifyOtpScreen.dart';
 
 class AppRoutes {
   static const String signIn = '/signin';
@@ -29,8 +31,7 @@ class AppRoutes {
   static const String incident_management = '/incident_management';
   static const String task_management = '/task_management';
   static const String attendance_tracking = '/attendance_tracking';
-
-
+  static const String changePassword = '/change-password';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -40,6 +41,11 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const HomeScreen());
       case pointage:
         return MaterialPageRoute(builder: (_) => const PointageScreen());
+      case changePassword:
+        return MaterialPageRoute(
+          builder: (_) => const ChangePasswordScreen(),
+          settings: settings, // ← Important pour passer les arguments
+        );
       case signUp:
         return MaterialPageRoute(builder: (_) => const SignUpScreen());
       case forgotPassword:
@@ -51,7 +57,10 @@ class AppRoutes {
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfilEmployePage());
       case verifyOtp:
-        return MaterialPageRoute(builder: (_) => const VerifyCodeScreen());
+        return MaterialPageRoute(
+          builder: (_) => const VerifyCodeScreen(), // ← Nom correct
+          settings: settings, // ← CRUCIAL : Ajout pour passer les arguments
+        );
       case adminDashboard:
         return MaterialPageRoute(builder: (_) => const AdminDashboard());
       case usersScreen:

@@ -6,6 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
+
+import '../../../Provider/Providertheme.dart'; // Assure-toi que le chemin est correct
 
 class AdminProfileScreen extends StatefulWidget {
   const AdminProfileScreen({super.key});
@@ -68,9 +71,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: _buildAppBar(),
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF121212)
+          : const Color(0xFFF8F9FA),
+      appBar: _buildAppBar(context),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
@@ -84,6 +92,12 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               _buildNotificationSecuritySection(),
               const SizedBox(height: 32),
               _buildHistorySection(),
+              const SizedBox(height: 32),
+              // --- Nouvelle section : Préférences ---
+              _buildPreferencesSection(context, themeProvider, theme),
+              const SizedBox(height: 32),
+              // --- Bouton de déconnexion ---
+              _buildLogoutSection(context),
             ],
           ),
         ),
@@ -91,7 +105,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     );
   }
 
-  AppBar _buildAppBar() {
+  AppBar _buildAppBar(BuildContext context) {
     return AppBar(
       backgroundColor: const Color(0xFF005B96),
       elevation: 0,
@@ -107,6 +121,7 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
         icon: const Icon(Icons.arrow_back, color: Colors.white),
         onPressed: () => Navigator.of(context).pop(),
       ),
+      // ⚠️ ICI : Plus d'icônes dans l'AppBar
     );
   }
 
@@ -174,7 +189,14 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-
+          const SizedBox(height: 8),
+          Text(
+            "Dernière connexion: $_adminLastLogin",
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
+          ),
         ],
       ),
     );
@@ -298,7 +320,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 return Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Colors.grey[50],
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey[850]
+                        : Colors.grey[50],
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -319,7 +343,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                         action['target'],
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[700],
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey[400]
+                              : Colors.grey[700],
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -332,7 +358,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                               action['time'],
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey[600],
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey[500]
+                                    : Colors.grey[600],
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -344,7 +372,9 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                               "IP: ${action['ip']}",
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.grey[500],
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey[600]
+                                    : Colors.grey[500],
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -378,6 +408,71 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ✅ NOUVELLE SECTION : Préférences (Dark Mode Toggle)
+  Widget _buildPreferencesSection(BuildContext context, ThemeProvider themeProvider, ThemeData theme) {
+    return Container(
+      decoration: _cardDecoration(),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader(Icons.settings, "Préférences"),
+            const SizedBox(height: 20),
+            ListTile(
+              leading: Icon(
+                theme.brightness == Brightness.dark ? Icons.wb_sunny : Icons.nightlight_round,
+                color: const Color(0xFF005B96),
+              ),
+              title: Text(
+                theme.brightness == Brightness.dark ? "Mode clair" : "Mode sombre",
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF005B96),
+                ),
+              ),
+              trailing: Switch(
+                value: theme.brightness == Brightness.dark,
+                onChanged: (value) {
+                  themeProvider.toggleTheme();
+                },
+                activeColor: const Color(0xFF005B96),
+              ),
+              onTap: () {
+                themeProvider.toggleTheme();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ✅ NOUVELLE SECTION : Déconnexion
+  Widget _buildLogoutSection(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.red.withOpacity(0.3), width: 1),
+      ),
+      child: ListTile(
+        leading: const Icon(Icons.logout, color: Colors.red),
+        title: const Text(
+          "Se déconnecter",
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.red,
+          ),
+        ),
+        onTap: () => _showLogoutConfirmation(context),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       ),
     );
   }
@@ -473,7 +568,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
                 );
                 return;
               }
-              // Simuler changement
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(content: Text("Mot de passe mis à jour avec succès")),
               );
@@ -527,7 +621,6 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
             },
             child: const Text("Appareil photo"),
           ),
-          // Optionnel : Réinitialiser à l'image par défaut
           TextButton(
             onPressed: () {
               setState(() {
@@ -609,6 +702,34 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
     await Printing.sharePdf(
       bytes: await pdf.save(),
       filename: "historique_actions_admin_${DateTime.now().millisecondsSinceEpoch}.pdf",
+    );
+  }
+
+  void _showLogoutConfirmation(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Confirmer la déconnexion"),
+        content: const Text("Êtes-vous sûr de vouloir vous déconnecter ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Déconnexion réussie")),
+              );
+              // Redirige vers la page de connexion
+              Navigator.of(context).pushNamedAndRemoveUntil('/signin', (route) => false);
+            },
+            child: const Text("Se déconnecter", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -715,7 +836,13 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
 
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
-      gradient: const LinearGradient(
+      gradient: Theme.of(context).brightness == Brightness.dark
+          ? const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF2D2D2D), Color(0xFF1E1E1E)],
+      )
+          : const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [Colors.white, Color(0xFFF8F9FA)],

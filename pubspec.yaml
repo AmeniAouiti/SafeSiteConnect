@@ -21,12 +21,16 @@ dependencies:
   open_file: ^3.3.0
   printing: ^5.11.2
   image_picker: ^1.0.4
+  provider: ^6.1.1
+  dio: ^5.4.0+1
+  shared_preferences: ^2.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1  # ✅ Ajouté ici
+
 
 
 

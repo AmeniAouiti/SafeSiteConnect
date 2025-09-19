@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../navigation/route.dart'; // Adapte le chemin selon ta structure
+import 'package:provider/provider.dart';
+import '../../ViewsModels/auth_viewmodel.dart';
+import '../../navigation/route.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -33,27 +35,107 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: SizedBox(
-        height: MediaQuery.of(context).size.height,
-        width: MediaQuery.of(context).size.width,
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF005B96),
-                Color(0xFFE8F5E8),
-                Color(0xFFF0F0F0),
-              ],
-              stops: [0.0, 0.5, 1.0],
+  Future<void> _handleForgotPassword() async {
+    if (_formKey.currentState!.validate()) {
+      final viewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+      // Afficher snackbar de chargement
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              SizedBox(width: 16),
+              Text('Envoi du code...'),
+            ],
+          ),
+          backgroundColor: Color(0xFF7ED957),
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      final userId = await viewModel.forgotPassword(_emailController.text);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Debug logs
+      print('🔍 DEBUG - userId reçu: $userId');
+      print('🔍 DEBUG - errorMessage: ${viewModel.errorMessage}');
+
+      if (viewModel.errorMessage != null) {
+        print('❌ ERREUR détectée: ${viewModel.errorMessage}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(viewModel.errorMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
             ),
           ),
-          child: SafeArea(
+        );
+      } else if (userId != null) {
+        print('✅ SUCCÈS - Navigation vers VerifyOtp avec userId: $userId');
+
+        // Afficher le message de succès
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Code envoyé à votre email !'),
+            backgroundColor: Color(0xFF7ED957),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Navigation automatique après 1.5 secondes
+        await Future.delayed(const Duration(milliseconds: 1500));
+
+        // Vérifier que le contexte est toujours valide
+        if (mounted) {
+          Navigator.pushNamed(context, AppRoutes.verifyOtp, arguments: userId);
+          print('🚀 Navigation exécutée vers VerifyOtp');
+        }
+      } else {
+        print('⚠️ ATTENTION - userId est null mais pas d\'errorMessage');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Une erreur inattendue s\'est produite'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = Provider.of<AuthViewModel>(context);
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            height: MediaQuery.of(context).size.height,
+            width: MediaQuery.of(context).size.width,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF005B96),
+                  Color(0xFFE8F5E8),
+                  Color(0xFFF0F0F0),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+
+          // Content
+          SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: SingleChildScrollView(
@@ -64,14 +146,41 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const SizedBox(height: 30),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 400),
-                      child: _buildForm(context),
+                      child: _buildForm(context, viewModel),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
-        ),
+
+          // Loading overlay
+          if (viewModel.isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.6),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Color(0xFF7ED957),
+                      strokeWidth: 4,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Envoi du code...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -143,7 +252,8 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Entrez votre adresse e-mail',
+          'Entrez votre adresse e-mail pour recevoir un code de vérification',
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
             color: Colors.white.withOpacity(0.9),
@@ -154,9 +264,9 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildForm(BuildContext context) {
+  Widget _buildForm(BuildContext context, AuthViewModel viewModel) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -179,10 +289,10 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildEmailField(),
+            const SizedBox(height: 24),
+            _buildSendLinkButton(viewModel),
             const SizedBox(height: 20),
-            _buildSendLinkButton(),
-            const SizedBox(height: 16),
-            _buildBackToSignInButton(),
+            _buildBackToSignInButton(context),
           ],
         ),
       ),
@@ -249,16 +359,17 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           filled: true,
           fillColor: Colors.transparent,
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
         keyboardType: TextInputType.emailAddress,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) => _handleForgotPassword(),
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Veuillez entrer un email';
           }
           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-            return 'Email invalide';
+            return 'Format d\'email invalide';
           }
           return null;
         },
@@ -266,11 +377,13 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildSendLinkButton() {
+  Widget _buildSendLinkButton(AuthViewModel viewModel) {
+    final isEnabled = _isButtonEnabled && !viewModel.isLoading;
+
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        gradient: _isButtonEnabled
+        gradient: isEnabled
             ? const LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
@@ -288,7 +401,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: _isButtonEnabled
+        boxShadow: isEnabled
             ? [
           BoxShadow(
             color: const Color(0xFF7ED957).withOpacity(0.3),
@@ -299,16 +412,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             : null,
       ),
       child: ElevatedButton(
-        onPressed: _isButtonEnabled
-            ? () {
-          if (_formKey.currentState!.validate()) {
-            // Utilise la route nommée si tu as une page de vérification OTP
-            Navigator.pushNamed(context, AppRoutes.verifyOtp);
-            // Sinon exemple avec push
-            // Pour l'instant, laisse un TODO ou mets la navigation souhaitée ici
-          }
-        }
-            : null,
+        onPressed: isEnabled ? _handleForgotPassword : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
@@ -317,8 +421,17 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: const Text(
-          'Envoyer le lien',
+        child: viewModel.isLoading
+            ? const SizedBox(
+          height: 20,
+          width: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
+            : const Text(
+          'Envoyer le code',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -329,7 +442,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildBackToSignInButton() {
+  Widget _buildBackToSignInButton(BuildContext context) {
     return Container(
       height: 50,
       decoration: BoxDecoration(

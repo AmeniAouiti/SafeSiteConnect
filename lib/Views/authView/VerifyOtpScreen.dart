@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'ChangePasswordScreen.dart';
-import 'SignInScreen.dart';
+import 'package:provider/provider.dart';
+import '../../ViewsModels/auth_viewmodel.dart';
+import '../../navigation/route.dart';
 
 class VerifyCodeScreen extends StatefulWidget {
   const VerifyCodeScreen({super.key});
@@ -13,19 +14,110 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
   final _formKey = GlobalKey<FormState>();
   final _otpController = TextEditingController();
   bool _isButtonEnabled = false;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
     _otpController.addListener(_validateForm);
+    _retrieveUserId(); // Appel pour récupérer userId après le build
+  }
+
+  void _retrieveUserId() {
+    // Utiliser addPostFrameCallback pour récupérer les arguments après le premier build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final arguments = ModalRoute.of(context)?.settings.arguments;
+      print('📦 Arguments reçus: $arguments'); // Debug log
+
+      if (arguments is String) {
+        setState(() {
+          _userId = arguments;
+        });
+        print('📦 UserId reçu dans VerifyCode: $_userId');
+      } else {
+        print('❌ Erreur: Arguments invalides ou userId manquant');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur: ID utilisateur manquant. Retour à la page précédente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        // Retour automatique si userId manquant
+        Navigator.pop(context);
+      }
+    });
   }
 
   void _validateForm() {
     setState(() {
       _isButtonEnabled = _otpController.text.isNotEmpty &&
-          _otpController.text.length == 6 &&
-          RegExp(r'^\d{6}$').hasMatch(_otpController.text);
+          _otpController.text.length == 4 &&
+          RegExp(r'^\d{4}$').hasMatch(_otpController.text);
     });
+  }
+
+  Future<void> _handleVerifyOtp() async {
+    if (_formKey.currentState!.validate() && _userId != null) {
+      final viewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+      // Afficher snackbar de chargement
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              SizedBox(width: 16),
+              Text('Vérification du code...'),
+            ],
+          ),
+          backgroundColor: Color(0xFF7ED957),
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      final success = await viewModel.verifyOtp(_userId!, _otpController.text);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      if (viewModel.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(viewModel.errorMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentSnackBar(),
+            ),
+          ),
+        );
+      } else if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Code vérifié avec succès !'),
+            backgroundColor: Color(0xFF7ED957),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        // Navigation vers ChangePassword avec userId
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (mounted) {
+          Navigator.pushReplacementNamed(
+              context,
+              AppRoutes.changePassword,
+              arguments: _userId
+          );
+        }
+      }
+    } else if (_userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur: ID utilisateur manquant'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -36,25 +128,32 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final viewModel = Provider.of<AuthViewModel>(context);
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: SizedBox(
-        height: MediaQuery.of(context).size.height,
-        width: MediaQuery.of(context).size.width,
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF005B96),
-                Color(0xFFE8F5E8),
-                Color(0xFFF0F0F0),
-              ],
-              stops: [0.0, 0.5, 1.0],
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            height: MediaQuery.of(context).size.height,
+            width: MediaQuery.of(context).size.width,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF005B96),
+                  Color(0xFFE8F5E8),
+                  Color(0xFFF0F0F0),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
             ),
           ),
-          child: SafeArea(
+
+          // Content
+          SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: SingleChildScrollView(
@@ -65,14 +164,41 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
                     const SizedBox(height: 30),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 400),
-                      child: _buildForm(context),
+                      child: _buildForm(context, viewModel),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
-        ),
+
+          // Loading overlay
+          if (viewModel.isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.6),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Color(0xFF7ED957),
+                      strokeWidth: 4,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Vérification du code...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -127,7 +253,7 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
         ),
         const SizedBox(height: 20),
         Text(
-          'Vérification OTP',
+          'Vérification du code',
           style: TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -144,7 +270,8 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Entrez le code reçu par email',
+          'Entrez le code à 4 chiffres envoyé à votre email',
+          textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
             color: Colors.white.withOpacity(0.9),
@@ -155,9 +282,9 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
     );
   }
 
-  Widget _buildForm(BuildContext context) {
+  Widget _buildForm(BuildContext context, AuthViewModel viewModel) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -180,10 +307,10 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildOtpField(),
+            const SizedBox(height: 24),
+            _buildVerifyButton(viewModel),
             const SizedBox(height: 20),
-            _buildVerifyButton(),
-            const SizedBox(height: 16),
-            _buildBackToSignInButton(),
+            _buildBackToSignInButton(context),
           ],
         ),
       ),
@@ -211,11 +338,12 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
         controller: _otpController,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 4.0,
         ),
         decoration: InputDecoration(
-          labelText: 'Code OTP',
+          labelText: 'Code OTP (4 chiffres)',
           labelStyle: TextStyle(
             color: Colors.white.withOpacity(0.8),
             fontWeight: FontWeight.w500,
@@ -233,6 +361,7 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
               size: 18,
             ),
           ),
+          counterText: '',
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
@@ -250,17 +379,23 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
           ),
           filled: true,
           fillColor: Colors.transparent,
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
         keyboardType: TextInputType.number,
-        maxLength: 6,
+        maxLength: 4,
+        textAlign: TextAlign.center,
+        textInputAction: TextInputAction.done,
+        enabled: _userId != null, // Désactiver si userId manquant
+        onFieldSubmitted: _userId != null ? (_) => _handleVerifyOtp() : null,
         validator: (value) {
+          if (_userId == null) {
+            return 'Erreur: ID utilisateur manquant';
+          }
           if (value == null || value.isEmpty) {
             return 'Veuillez entrer le code OTP';
           }
-          if (!RegExp(r'^\d{6}$').hasMatch(value)) {
-            return 'Le code OTP doit être composé de 6 chiffres';
+          if (!RegExp(r'^\d{4}$').hasMatch(value)) {
+            return 'Le code OTP doit être composé de 4 chiffres';
           }
           return null;
         },
@@ -268,11 +403,13 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
     );
   }
 
-  Widget _buildVerifyButton() {
+  Widget _buildVerifyButton(AuthViewModel viewModel) {
+    final isEnabled = _isButtonEnabled && !viewModel.isLoading && _userId != null;
+
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        gradient: _isButtonEnabled
+        gradient: isEnabled
             ? const LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
@@ -290,7 +427,7 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: _isButtonEnabled
+        boxShadow: isEnabled
             ? [
           BoxShadow(
             color: const Color(0xFF7ED957).withOpacity(0.3),
@@ -301,18 +438,7 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
             : null,
       ),
       child: ElevatedButton(
-        onPressed: _isButtonEnabled
-            ? () {
-          if (_formKey.currentState!.validate()) {
-            // Navigate to ChangePasswordScreen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => const ChangePasswordScreen()),
-            );
-          }
-        }
-            : null,
+        onPressed: isEnabled ? _handleVerifyOtp : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
@@ -321,7 +447,16 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: const Text(
+        child: viewModel.isLoading
+            ? const SizedBox(
+          height: 20,
+          width: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
+            : const Text(
           'Vérifier le code',
           style: TextStyle(
             fontSize: 16,
@@ -333,7 +468,7 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
     );
   }
 
-  Widget _buildBackToSignInButton() {
+  Widget _buildBackToSignInButton(BuildContext context) {
     return Container(
       height: 50,
       decoration: BoxDecoration(
@@ -352,10 +487,7 @@ class VerifyCodeScreenState extends State<VerifyCodeScreen> {
       ),
       child: TextButton(
         onPressed: () {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const SignInScreen()),
-          );
+          Navigator.pushReplacementNamed(context, AppRoutes.signIn);
         },
         style: TextButton.styleFrom(
           shape: RoundedRectangleBorder(

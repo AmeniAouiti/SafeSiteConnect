@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../Provider/Providertheme.dart';
 import '../../../navigation/CustomBottomNavigationBar.dart';
 
 class ProfilEmployePage extends StatefulWidget {
@@ -11,7 +13,7 @@ class ProfilEmployePage extends StatefulWidget {
 class _ProfilEmployePageState extends State<ProfilEmployePage> {
   // State variables
   int _currentIndex = 4;
-  bool _isDarkMode = false;
+
   final Map<String, dynamic> _employeeData = {
     'fullName': 'Hassan Fayech',
     'role': 'Électricien',
@@ -19,18 +21,16 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
     'email': 'hassan.fayech@safesiteconnect.com',
     'phone': '+216 58 932 240',
     'employeeId': 'EMP-123456',
-    'address': '106 Cité El-Ghazela Ariana, Tunisie',
-    'hireDate': '15/03/2020',
     'status': 'En service',
     'avatarUrl': 'assets/hassan.jpg',
   };
 
-  void _toggleTheme() {
-    setState(() {
-      _isDarkMode = !_isDarkMode;
-      // TODO: Implement theme toggle logic
-    });
-  }
+  // Mock data for personal stats
+  final Map<String, dynamic> _stats = {
+    'pointages': {'thisMonth': 22, 'absences': 1, 'retards': 2},
+    'incidents': {'reported': 3, 'resolved': 2, 'pending': 1},
+    'tasks': {'assigned': 15, 'completed': 12, 'overdue': 1},
+  };
 
   void _showEditProfileDialog() {
     showModalBottomSheet(
@@ -43,10 +43,15 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: _buildAppBar(),
-      body: _buildBody(),
+      backgroundColor: theme.brightness == Brightness.dark
+          ? const Color(0xFF121212)
+          : const Color(0xFFF8F9FA),
+      appBar: _buildAppBar(themeProvider),
+      body: _buildBody(context),
       bottomNavigationBar: CustomBottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -54,7 +59,8 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
     );
   }
 
-  AppBar _buildAppBar() {
+  AppBar _buildAppBar(ThemeProvider themeProvider) {
+    final theme = Theme.of(context);
     return AppBar(
       backgroundColor: const Color(0xFF005B96),
       elevation: 0,
@@ -70,18 +76,20 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
       actions: [
         IconButton(
           icon: Icon(
-            _isDarkMode ? Icons.light_mode : Icons.dark_mode,
+            theme.brightness == Brightness.dark ? Icons.wb_sunny : Icons.nightlight_round,
             color: Colors.white,
             size: 24,
           ),
-          onPressed: _toggleTheme,
+          onPressed: () {
+            themeProvider.toggleTheme();
+          },
         ),
         const SizedBox(width: 8),
       ],
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -94,6 +102,10 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
                 _buildProfileHeader(),
                 const SizedBox(height: 32),
                 _buildInfoCard(),
+                const SizedBox(height: 32),
+                _buildStatsCard(),
+                const SizedBox(height: 32),
+                _buildSecurityCard(),
                 const SizedBox(height: 32),
                 _buildActionButtons(),
               ],
@@ -187,10 +199,6 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
             const Divider(height: 20, color: Colors.grey),
             _buildInfoRow(Icons.badge, "Matricule", _employeeData['employeeId'] ?? 'Non disponible'),
             const Divider(height: 20, color: Colors.grey),
-            _buildInfoRow(Icons.home, "Adresse", _employeeData['address'] ?? 'Non disponible'),
-            const Divider(height: 20, color: Colors.grey),
-            _buildInfoRow(Icons.calendar_today, "Date d'embauche", _employeeData['hireDate'] ?? 'Non disponible'),
-            const Divider(height: 20, color: Colors.grey),
             _buildInfoRow(
               Icons.work,
               "Statut",
@@ -200,6 +208,144 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
                   : _employeeData['status'] == 'En pause'
                   ? Colors.orange
                   : Colors.red,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsCard() {
+    return Container(
+      decoration: _cardDecoration(),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF005B96).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.bar_chart, color: Color(0xFF005B96), size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  "Statistiques Personnelles",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF005B96),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildStatItem("Pointages ce mois", "${_stats['pointages']['thisMonth']}", Icons.calendar_today, Colors.blue),
+            const SizedBox(height: 12),
+            _buildStatItem("Incidents signalés", "${_stats['incidents']['reported']}", Icons.warning, Colors.orange),
+            const SizedBox(height: 12),
+            _buildStatItem("Tâches terminées", "${_stats['tasks']['completed']}/${_stats['tasks']['assigned']}", Icons.task, Colors.green),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityCard() {
+    bool _notificationsEnabled = true;
+    bool _emailAlerts = true;
+    bool _twoFactorAuth = false;
+
+    return Container(
+      decoration: _cardDecoration(),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF005B96).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.security, color: Color(0xFF005B96), size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  "Paramètres & Sécurité",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF005B96),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildSwitchRow("Notifications activées", _notificationsEnabled, (value) {}),
+            if (_notificationsEnabled) ...[
+              const SizedBox(height: 12),
+              _buildSwitchRow("Alertes par email", _emailAlerts, (value) {}),
+            ],
+            const SizedBox(height: 16),
+            _buildSwitchRow("Authentification à 2 facteurs", _twoFactorAuth, (value) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(value ? "2FA activée" : "2FA désactivée")),
+              );
+            }),
+            if (_twoFactorAuth) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.info_outline, color: Colors.blue, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "Un code vous sera envoyé à chaque connexion.",
+                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  // Ouvrir changement de mot de passe
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Changement de mot de passe simulé")),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF005B96)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.password, size: 18),
+                label: const Text(
+                  "Changer le mot de passe",
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF005B96)),
+                ),
+              ),
             ),
           ],
         ),
@@ -254,7 +400,6 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
   Widget _buildEditProfileSheet() {
     final TextEditingController emailController = TextEditingController(text: _employeeData['email']);
     final TextEditingController phoneController = TextEditingController(text: _employeeData['phone']);
-    final TextEditingController addressController = TextEditingController(text: _employeeData['address']);
 
     return Padding(
       padding: EdgeInsets.all(20.0) + EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -300,14 +445,6 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: addressController,
-              decoration: InputDecoration(
-                labelText: 'Adresse',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -322,9 +459,11 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
                     setState(() {
                       _employeeData['email'] = emailController.text;
                       _employeeData['phone'] = phoneController.text;
-                      _employeeData['address'] = addressController.text;
                     });
                     Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Profil mis à jour")),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF005B96),
@@ -340,9 +479,18 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
     );
   }
 
+  // UTILS
+
   BoxDecoration _cardDecoration() {
+    final theme = Theme.of(context);
     return BoxDecoration(
-      gradient: const LinearGradient(
+      gradient: theme.brightness == Brightness.dark
+          ? const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF2D2D2D), Color(0xFF1E1E1E)],
+      )
+          : const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [Colors.white, Color(0xFFF8F9FA)],
@@ -359,6 +507,7 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value, {Color? valueColor}) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Icon(icon, size: 20, color: const Color(0xFF005B96)),
@@ -367,7 +516,7 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
           "$label: ",
           style: TextStyle(
             fontSize: 16,
-            color: Colors.grey[600],
+            color: theme.brightness == Brightness.dark ? Colors.grey[400] : Colors.grey[600],
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -379,6 +528,64 @@ class _ProfilEmployePageState extends State<ProfilEmployePage> {
               color: valueColor ?? const Color(0xFF005B96),
               fontWeight: FontWeight.w600,
             ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.grey,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: const Color(0xFF005B96),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSwitchRow(String title, bool value, ValueChanged<bool> onChanged) {
+    return Row(
+      children: [
+        Switch(
+          value: value,
+          onChanged: onChanged,
+          activeColor: const Color(0xFF005B96),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF005B96),
+            ),
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),

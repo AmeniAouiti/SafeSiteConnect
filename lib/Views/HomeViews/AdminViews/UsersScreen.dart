@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../Models/user_model.dart';
+import '../../../ViewsModels/user_viewmodel.dart';
+
 import 'CustomBottomNavigationBarAdmin.dart';
 
 class UsersScreen extends StatefulWidget {
@@ -12,71 +16,19 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   int _currentIndex = 1;
   final String _adminName = "Admin Principal";
   String _searchQuery = '';
-  late TabController _tabController;
+  late UserViewModel _userViewModel;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _userViewModel = Provider.of<UserViewModel>(context, listen: false);
+    _loadUsers();
   }
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  final List<Map<String, dynamic>> _employees = [
-    {
-      'id': 'EMP001',
-      'name': 'Hassan Fayech',
-      'role': 'Technicien',
-      'status': 'Actif',
-      'email': 'hassan.fayech@company.com',
-      'password': 'pass123',
-      'permissions': ['Pointage', 'Rapport'],
-      'department': 'Technique',
-      'joinDate': '2023-01-15',
-    },
-    {
-      'id': 'EMP002',
-      'name': 'Amina Zaki',
-      'role': 'Manager',
-      'status': 'En congé',
-      'email': 'amina.zaki@company.com',
-      'password': 'pass456',
-      'permissions': ['Pointage', 'Rapport', 'Gestion équipes'],
-      'department': 'Management',
-      'joinDate': '2022-03-20',
-    },
-    {
-      'id': 'EMP003',
-      'name': 'Youssef Benali',
-      'role': 'Opérateur',
-      'status': 'Inactif',
-      'email': 'youssef.benali@company.com',
-      'password': 'pass789',
-      'permissions': ['Pointage'],
-      'department': 'Production',
-      'joinDate': '2023-06-10',
-    },
-    {
-      'id': 'EMP004',
-      'name': 'Sara Mansouri',
-      'role': 'Superviseur',
-      'status': 'Actif',
-      'email': 'sara.mansouri@company.com',
-      'password': 'pass101',
-      'permissions': ['Pointage', 'Rapport', 'Supervision'],
-      'department': 'Qualité',
-      'joinDate': '2022-11-05',
-    },
-  ];
-
-  List<Map<String, dynamic>> get filteredEmployees {
-    if (_searchQuery.isEmpty) return _employees;
-    return _employees.where((employee) =>
-        employee['name'].toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+  void _loadUsers() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _userViewModel.loadUsers();
+    });
   }
 
   @override
@@ -149,23 +101,27 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   }
 
   Widget _buildBody() {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          _buildHeaderGradient(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildSearchSection(),
-                const SizedBox(height: 16),
-                _buildTabsSection(),
-              ],
-            ),
+    return Consumer<UserViewModel>(
+      builder: (context, viewModel, child) {
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              _buildHeaderGradient(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSearchSection(),
+                    const SizedBox(height: 16),
+                    _buildUsersSection(viewModel),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -205,7 +161,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildTabsSection() {
+  Widget _buildUsersSection(UserViewModel viewModel) {
     return Container(
       decoration: _cardDecoration(),
       child: Column(
@@ -218,256 +174,241 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 topRight: Radius.circular(16),
               ),
             ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: Colors.white,
-              indicatorWeight: 2,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white60,
-              labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-              tabs: const [
-                Tab(text: "Employés"),
-                Tab(text: "Permissions"),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.people, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    "Utilisateurs",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (viewModel.isLoading)
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           Container(
-            height: MediaQuery.of(context).size.height * 0.6,
             padding: const EdgeInsets.all(16),
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildEmployeesTab(),
-                _buildPermissionsTab(),
-              ],
-            ),
+            child: _buildUsersList(viewModel),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmployeesTab() {
-    return filteredEmployees.isEmpty
-        ? _buildEmptyState()
-        : ListView.separated(
-      itemCount: filteredEmployees.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => _buildEmployeeCard(filteredEmployees[index]),
-    );
-  }
+  Widget _buildUsersList(UserViewModel viewModel) {
+    if (viewModel.isLoading && viewModel.users.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(
+            color: Color(0xFF005B96),
+          ),
+        ),
+      );
+    }
 
-  Widget _buildPermissionsTab() {
+    if (viewModel.errorMessage != null) {
+      return _buildErrorState(viewModel);
+    }
+
+    final filteredUsers = viewModel.getFilteredUsers(_searchQuery);
+
+    if (filteredUsers.isEmpty) {
+      return _buildEmptyState();
+    }
+
     return ListView.separated(
-      itemCount: _employees.length,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: filteredUsers.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => _buildPermissionCard(_employees[index]),
+      itemBuilder: (context, index) => _buildEmployeeCard(filteredUsers[index] as UserModel, viewModel),
     );
   }
 
-  Widget _buildEmployeeCard(Map<String, dynamic> employee) {
-    Color statusColor = _getStatusColor(employee['status']);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.person, color: statusColor, size: 20),
+  Widget _buildErrorState(UserViewModel viewModel) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      employee['name'],
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF005B96),
-                      ),
-                    ),
-                    Text(
-                      '${employee['role']} • ${employee['department']}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  employee['status'],
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(8),
+              child: const Icon(Icons.error_outline, size: 40, color: Colors.red),
             ),
-            child: Row(
-              children: [
-                Icon(Icons.email_outlined, size: 14, color: Colors.grey[600]),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    employee['email'],
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 12),
+            Text(
+              "Erreur",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _showEditEmployeeDialog(employee),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF005B96),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.edit, size: 14),
-                  label: const Text("Modifier", style: TextStyle(fontSize: 11)),
-                ),
+            Text(
+              viewModel.errorMessage!,
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () {
+                viewModel.clearError();
+                _loadUsers();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF005B96),
+                foregroundColor: Colors.white,
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showPermissionsDialog(employee),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF005B96),
-                    side: const BorderSide(color: Color(0xFF005B96)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  icon: const Icon(Icons.security, size: 14),
-                  label: const Text("Permissions", style: TextStyle(fontSize: 11)),
-                ),
-              ),
-            ],
-          ),
-        ],
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text("Réessayer", style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildPermissionCard(Map<String, dynamic> employee) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: _cardDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF005B96).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.person, color: Color(0xFF005B96), size: 20),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      employee['name'],
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF005B96),
-                      ),
-                    ),
-                    Text(
-                      '${employee['role']} • ${employee['department']}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.edit, color: Color(0xFF005B96), size: 18),
-                onPressed: () => _showPermissionsDialog(employee),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildEmployeeCard(UserModel employee, UserViewModel viewModel) {
+    Color statusColor = _getStatusColor(employee.isActive ?? true ? 'Actif' : 'Inactif');
+
+    return GestureDetector(
+      onTap: () => _showUserDetailsDialog(employee, viewModel),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: _cardDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                const Text(
-                  'Permissions accordées:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF10B981),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(Icons.person, color: statusColor, size: 20),
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: employee['permissions'].map<Widget>((permission) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        permission,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        employee.nom,
                         style: const TextStyle(
-                          fontSize: 10,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF005B96),
                         ),
                       ),
-                    );
-                  }).toList(),
+                      Text(
+                        '${employee.role} • ${employee.poste}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    employee.isActive ?? true ? 'Actif' : 'Inactif',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: statusColor,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.email_outlined, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      employee.email,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: viewModel.isLoading
+                        ? null
+                        : () => _showEditEmployeeDialog(employee, viewModel),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF005B96),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.edit, size: 14),
+                    label: const Text("Modifier", style: TextStyle(fontSize: 11)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: viewModel.isLoading
+                        ? null
+                        : () => _showDeleteConfirmationDialog(employee, viewModel),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF4444),
+                      side: const BorderSide(color: Color(0xFFEF4444)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: const Icon(Icons.delete, size: 14),
+                    label: const Text("Supprimer", style: TextStyle(fontSize: 11)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -487,7 +428,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
           ),
           const SizedBox(height: 12),
           Text(
-            "Aucun employé trouvé",
+            "Aucun utilisateur trouvé",
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
@@ -534,12 +475,15 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     }
   }
 
+  // DIALOG POUR AJOUTER UN UTILISATEUR AVEC MVVM
   void _showAddEmployeeDialog() {
     final nameController = TextEditingController();
     final emailController = TextEditingController();
     final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
     String? selectedRole;
-    String? selectedDepartment;
+    String? selectedPost;
+    String? selectedDepartement;
 
     showDialog(
       context: context,
@@ -556,138 +500,233 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
             ),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF7ED957).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(Icons.person_add, color: Color(0xFF7ED957), size: 16),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      "Ajouter employé",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF005B96),
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 16),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: nameController,
-                  decoration: _buildInputDecoration('Nom', Icons.person_outline),
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: emailController,
-                  decoration: _buildInputDecoration('Email', Icons.email_outlined),
-                  keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: passwordController,
-                  decoration: _buildInputDecoration('Mot de passe', Icons.lock_outline),
-                  obscureText: true,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  decoration: _buildInputDecoration('Rôle', Icons.work_outline),
-                  items: ['Technicien', 'Manager', 'Opérateur', 'Superviseur']
-                      .map((role) => DropdownMenuItem(value: role, child: Text(role, style: const TextStyle(fontSize: 12))))
-                      .toList(),
-                  onChanged: (value) => selectedRole = value,
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  decoration: _buildInputDecoration('Dépt.', Icons.business_outlined),
-                  items: ['Technique', 'Management', 'Production', 'Qualité']
-                      .map((dept) => DropdownMenuItem(value: dept, child: Text(dept, style: const TextStyle(fontSize: 12))))
-                      .toList(),
-                  onChanged: (value) => selectedDepartment = value,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF005B96),
-                          side: const BorderSide(color: Color(0xFF005B96)),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Consumer<UserViewModel>(
+                builder: (context, viewModel, child) {
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7ED957).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(Icons.person_add, color: Color(0xFF7ED957), size: 16),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              "Ajouter utilisateur",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF005B96),
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 16),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
                         ),
-                        child: const Text("Annuler", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (nameController.text.isNotEmpty &&
-                              emailController.text.isNotEmpty &&
-                              passwordController.text.isNotEmpty &&
-                              selectedRole != null &&
-                              selectedDepartment != null) {
-                            setState(() {
-                              _employees.add({
-                                'id': 'EMP${_employees.length + 1}'.padLeft(7, '0'),
-                                'name': nameController.text,
-                                'role': selectedRole!,
-                                'status': 'Actif',
-                                'email': emailController.text,
-                                'password': passwordController.text,
-                                'permissions': ['Pointage'],
-                                'department': selectedDepartment!,
-                                'joinDate': DateTime.now().toIso8601String().split('T')[0],
-                              });
-                            });
-                            Navigator.pop(context);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7ED957),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        if (viewModel.errorMessage != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    viewModel.errorMessage!,
+                                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: nameController,
+                          decoration: _buildInputDecoration('Nom', Icons.person_outline),
+                          style: const TextStyle(fontSize: 12),
+                          enabled: !viewModel.isLoading,
                         ),
-                        child: const Text("Ajouter", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: emailController,
+                          decoration: _buildInputDecoration('Email', Icons.email_outlined),
+                          keyboardType: TextInputType.emailAddress,
+                          style: const TextStyle(fontSize: 12),
+                          enabled: !viewModel.isLoading,
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: passwordController,
+                          decoration: _buildInputDecoration('Mot de passe', Icons.lock_outline),
+                          obscureText: true,
+                          style: const TextStyle(fontSize: 12),
+                          enabled: !viewModel.isLoading,
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: confirmPasswordController,
+                          decoration: _buildInputDecoration('Confirmer mot de passe', Icons.lock_outline),
+                          obscureText: true,
+                          style: const TextStyle(fontSize: 12),
+                          enabled: !viewModel.isLoading,
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedRole,
+                          decoration: _buildInputDecoration('Rôle', Icons.person_pin),
+                          items: ['Admin', 'Employee']
+                              .map((role) => DropdownMenuItem(
+                              value: role,
+                              child: Text(role, style: const TextStyle(fontSize: 12))))
+                              .toList(),
+                          onChanged: viewModel.isLoading ? null : (value) {
+                            setDialogState(() => selectedRole = value);
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedPost,
+                          decoration: _buildInputDecoration('Poste', Icons.work_outline),
+                          items: ['Technicien', 'Manager', 'Opérateur', 'Superviseur', 'Administrateur']
+                              .map((post) => DropdownMenuItem(
+                              value: post,
+                              child: Text(post, style: const TextStyle(fontSize: 12))))
+                              .toList(),
+                          onChanged: viewModel.isLoading ? null : (value) {
+                            setDialogState(() => selectedPost = value);
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedDepartement,
+                          decoration: _buildInputDecoration('Département', Icons.business_outlined),
+                          items: ['Technique', 'Management', 'Production', 'Qualité', 'Administration']
+                              .map((dept) => DropdownMenuItem(
+                              value: dept,
+                              child: Text(dept, style: const TextStyle(fontSize: 12))))
+                              .toList(),
+                          onChanged: viewModel.isLoading ? null : (value) {
+                            setDialogState(() => selectedDepartement = value);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: viewModel.isLoading ? null : () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF005B96),
+                                  side: const BorderSide(color: Color(0xFF005B96)),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: const Text("Annuler", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: viewModel.isLoading ? null : () async {
+                                  if (nameController.text.isNotEmpty &&
+                                      emailController.text.isNotEmpty &&
+                                      passwordController.text.isNotEmpty &&
+                                      confirmPasswordController.text.isNotEmpty &&
+                                      passwordController.text == confirmPasswordController.text &&
+                                      selectedRole != null &&
+                                      selectedPost != null &&
+                                      selectedDepartement != null) {
+
+                                    viewModel.clearError();
+
+                                    final success = await viewModel.createUser(
+                                      nom: nameController.text,
+                                      email: emailController.text,
+                                      motdepasse: passwordController.text,
+                                      confirmMotdepasse: confirmPasswordController.text,
+                                      role: selectedRole!,
+                                      poste: selectedPost!,
+                                      departement: selectedDepartement!,
+                                    );
+
+                                    if (success) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text("Utilisateur ajouté avec succès"),
+                                          backgroundColor: Color(0xFF7ED957),
+                                        ),
+                                      );
+                                    }
+                                    // L'erreur sera affichée automatiquement via le Consumer
+                                  } else {
+                                    // Validation locale
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("Veuillez remplir tous les champs correctement"),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF7ED957),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: viewModel.isLoading
+                                    ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                    : const Text("Ajouter", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  );
+                },
+              );
+            },
           ),
         ),
       ),
     );
   }
 
-  void _showEditEmployeeDialog(Map<String, dynamic> employee) {
-    final nameController = TextEditingController(text: employee['name']);
-    final emailController = TextEditingController(text: employee['email']);
-    final passwordController = TextEditingController(text: employee['password']);
-    String? selectedRole = employee['role'];
-    String? selectedDepartment = employee['department'];
-    String? selectedStatus = employee['status'];
+  // DIALOG POUR MODIFIER UN UTILISATEUR AVEC MVVM
+  void _showEditEmployeeDialog(UserModel employee, UserViewModel viewModel) {
+    final nameController = TextEditingController(text: employee.nom);
+    final emailController = TextEditingController(text: employee.email);
+    final passwordController = TextEditingController();
+    String? selectedRole = employee.role;
+    String? selectedPost = employee.poste;
+    String? selectedDepartement = employee.departement;
 
     showDialog(
       context: context,
@@ -704,135 +743,386 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
             ),
             borderRadius: BorderRadius.circular(12),
           ),
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return Consumer<UserViewModel>(
+                builder: (context, vm, child) {
+                  return SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF005B96).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(Icons.edit, color: Color(0xFF005B96), size: 16),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                "Modifier ${employee.nom}",
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF005B96),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 16),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                        if (vm.errorMessage != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.red, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    vm.errorMessage!,
+                                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: nameController,
+                          decoration: _buildInputDecoration('Nom', Icons.person_outline),
+                          style: const TextStyle(fontSize: 12),
+                          enabled: !vm.isLoading,
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: emailController,
+                          decoration: _buildInputDecoration('Email', Icons.email_outlined),
+                          keyboardType: TextInputType.emailAddress,
+                          style: const TextStyle(fontSize: 12),
+                          enabled: !vm.isLoading,
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: passwordController,
+                          decoration: _buildInputDecoration('Nouveau mot de passe (optionnel)', Icons.lock_outline),
+                          obscureText: true,
+                          style: const TextStyle(fontSize: 12),
+                          enabled: !vm.isLoading,
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedRole,
+                          decoration: _buildInputDecoration('Rôle', Icons.person_pin),
+                          items: ['Admin', 'Employee']
+                              .map((role) => DropdownMenuItem(
+                              value: role,
+                              child: Text(role, style: const TextStyle(fontSize: 12))))
+                              .toList(),
+                          onChanged: vm.isLoading ? null : (value) {
+                            setDialogState(() => selectedRole = value);
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedPost,
+                          decoration: _buildInputDecoration('Poste', Icons.work_outline),
+                          items: ['Technicien', 'Manager', 'Opérateur', 'Superviseur', 'Administrateur']
+                              .map((post) => DropdownMenuItem(
+                              value: post,
+                              child: Text(post, style: const TextStyle(fontSize: 12))))
+                              .toList(),
+                          onChanged: vm.isLoading ? null : (value) {
+                            setDialogState(() => selectedPost = value);
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: selectedDepartement,
+                          decoration: _buildInputDecoration('Département', Icons.business_outlined),
+                          items: ['Technique', 'Management', 'Production', 'Qualité', 'Administration']
+                              .map((dept) => DropdownMenuItem(
+                              value: dept,
+                              child: Text(dept, style: const TextStyle(fontSize: 12))))
+                              .toList(),
+                          onChanged: vm.isLoading ? null : (value) {
+                            setDialogState(() => selectedDepartement = value);
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: vm.isLoading ? null : () => Navigator.pop(context),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF005B96),
+                                  side: const BorderSide(color: Color(0xFF005B96)),
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: const Text("Annuler", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: vm.isLoading ? null : () async {
+                                  if (nameController.text.isNotEmpty &&
+                                      emailController.text.isNotEmpty &&
+                                      selectedRole != null &&
+                                      selectedPost != null &&
+                                      selectedDepartement != null) {
+
+                                    vm.clearError();
+
+                                    final success = await vm.updateUser(
+                                      userId: employee.id!,
+                                      nom: nameController.text,
+                                      email: emailController.text,
+                                      role: selectedRole!,
+                                      poste: selectedPost!,
+                                      departement: selectedDepartement!,
+                                      motdepasse: passwordController.text.isNotEmpty ? passwordController.text : null,
+                                    );
+
+                                    if (success) {
+                                      Navigator.pop(context);
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text("Utilisateur modifié avec succès"),
+                                          backgroundColor: Color(0xFF005B96),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    // Validation locale
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text("Veuillez remplir tous les champs obligatoires"),
+                                        backgroundColor: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF005B96),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: vm.isLoading
+                                    ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                    : const Text("Modifier", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // DIALOG DE CONFIRMATION DE SUPPRESSION
+  void _showDeleteConfirmationDialog(UserModel employee, UserViewModel viewModel) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning, color: Color(0xFFEF4444), size: 24),
+            const SizedBox(width: 8),
+            const Text("Confirmer la suppression"),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Êtes-vous sûr de vouloir supprimer ${employee.nom} ?"),
+            const SizedBox(height: 8),
+            Text(
+              "Cette action est irréversible.",
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Annuler"),
+          ),
+          Consumer<UserViewModel>(
+            builder: (context, vm, child) {
+              return ElevatedButton(
+                onPressed: vm.isLoading ? null : () async {
+                  final success = await vm.deleteUser(employee.id!);
+                  if (success) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("${employee.nom} a été supprimé"),
+                        backgroundColor: const Color(0xFFEF4444),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                ),
+                child: vm.isLoading
+                    ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                    : const Text("Supprimer"),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // DIALOG DE DÉTAIL UTILISATEUR
+  void _showUserDetailsDialog(UserModel employee, UserViewModel viewModel) {
+    Color statusColor = _getStatusColor(employee.isActive ?? true ? 'Actif' : 'Inactif');
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.white, Color(0xFFF8F9FA)],
+            ),
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF005B96).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
+                        color: statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.edit, color: Color(0xFF005B96), size: 16),
+                      child: Icon(Icons.person, color: statusColor, size: 24),
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        "Modifier ${employee['name']}",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF005B96),
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            employee.nom,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF005B96),
+                            ),
+                          ),
+                          Text(
+                            employee.email,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 16),
+                      icon: const Icon(Icons.close, size: 20),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: nameController,
-                  decoration: _buildInputDecoration('Nom', Icons.person_outline),
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: emailController,
-                  decoration: _buildInputDecoration('Email', Icons.email_outlined),
-                  keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: passwordController,
-                  decoration: _buildInputDecoration('Mot de passe', Icons.lock_outline),
-                  obscureText: true,
-                  style: const TextStyle(fontSize: 12),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedRole,
-                  decoration: _buildInputDecoration('Rôle', Icons.work_outline),
-                  items: ['Technicien', 'Manager', 'Opérateur', 'Superviseur']
-                      .map((role) => DropdownMenuItem(value: role, child: Text(role, style: const TextStyle(fontSize: 12))))
-                      .toList(),
-                  onChanged: (value) => selectedRole = value,
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedDepartment,
-                  decoration: _buildInputDecoration('Dépt.', Icons.business_outlined),
-                  items: ['Technique', 'Management', 'Production', 'Qualité']
-                      .map((dept) => DropdownMenuItem(value: dept, child: Text(dept, style: const TextStyle(fontSize: 12))))
-                      .toList(),
-                  onChanged: (value) => selectedDepartment = value,
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedStatus,
-                  decoration: _buildInputDecoration('Statut', Icons.info_outline),
-                  items: ['Actif', 'En congé', 'Inactif']
-                      .map((status) => DropdownMenuItem(value: status, child: Text(status, style: const TextStyle(fontSize: 12))))
-                      .toList(),
-                  onChanged: (value) => selectedStatus = value,
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
+                _buildInfoRow(Icons.info_outline, 'ID', employee.id ?? 'N/A'),
+                _buildInfoRow(Icons.badge, 'Rôle', employee.role),
+                _buildInfoRow(Icons.work, 'Poste', employee.poste),
+                _buildInfoRow(Icons.business, 'Département', employee.departement),
+                _buildInfoRow(Icons.calendar_today, 'Date d\'embauche', employee.joinDate ?? 'N/A'),
+                _buildInfoRow(Icons.email, 'Email', employee.email),
+                _buildInfoRow(Icons.lock, 'Mot de passe', '••••••••'),
+                _buildInfoRow(Icons.info, 'Statut', employee.isActive ?? true ? 'Actif' : 'Inactif', color: statusColor),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: OutlinedButton.icon(
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF005B96),
                           side: const BorderSide(color: Color(0xFF005B96)),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text("Annuler", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text("Fermer", style: TextStyle(fontSize: 12)),
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: ElevatedButton(
+                      child: ElevatedButton.icon(
                         onPressed: () {
-                          if (nameController.text.isNotEmpty &&
-                              emailController.text.isNotEmpty &&
-                              passwordController.text.isNotEmpty &&
-                              selectedRole != null &&
-                              selectedDepartment != null &&
-                              selectedStatus != null) {
-                            setState(() {
-                              final index = _employees.indexWhere((e) => e['id'] == employee['id']);
-                              _employees[index] = {
-                                'id': employee['id'],
-                                'name': nameController.text,
-                                'role': selectedRole!,
-                                'status': selectedStatus!,
-                                'email': emailController.text,
-                                'password': passwordController.text,
-                                'permissions': employee['permissions'],
-                                'department': selectedDepartment!,
-                                'joinDate': employee['joinDate'],
-                              };
-                            });
-                            Navigator.pop(context);
-                          }
+                          Navigator.pop(context);
+                          _showEditEmployeeDialog(employee, viewModel);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF005B96),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text("Modifier", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text("Modifier", style: TextStyle(fontSize: 12)),
                       ),
                     ),
                   ],
@@ -845,117 +1135,46 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     );
   }
 
-  void _showPermissionsDialog(Map<String, dynamic> employee) {
-    final availablePermissions = ['Pointage', 'Rapport', 'Gestion équipes', 'Supervision'];
-    List<String> selectedPermissions = List.from(employee['permissions']);
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.85,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Colors.white, Color(0xFFF8F9FA)],
+  Widget _buildInfoRow(IconData icon, String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: const Color(0xFF005B96).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
             ),
-            borderRadius: BorderRadius.circular(12),
+            child: Icon(icon, size: 16, color: color ?? const Color(0xFF005B96)),
           ),
-          child: SingleChildScrollView(
+          const SizedBox(width: 8),
+          Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Icon(Icons.security, color: Color(0xFF10B981), size: 16),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        "Perms: ${employee['name']}",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF005B96),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 16),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                const SizedBox(height: 8),
-                ...availablePermissions.map((permission) {
-                  return CheckboxListTile(
-                    title: Text(permission, style: const TextStyle(fontSize: 12)),
-                    value: selectedPermissions.contains(permission),
-                    activeColor: const Color(0xFF10B981),
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    onChanged: (bool? value) {
-                      setState(() {
-                        if (value == true) {
-                          selectedPermissions.add(permission);
-                        } else {
-                          selectedPermissions.remove(permission);
-                        }
-                      });
-                    },
-                  );
-                }),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF005B96),
-                          side: const BorderSide(color: Color(0xFF005B96)),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text("Annuler", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            final index = _employees.indexWhere((e) => e['id'] == employee['id']);
-                            _employees[index]['permissions'] = selectedPermissions;
-                          });
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: const Text("Enregistrer", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF005B96),
+                  ),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }

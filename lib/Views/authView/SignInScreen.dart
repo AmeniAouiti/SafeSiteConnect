@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../navigation/route.dart'; // Assure-toi que le chemin d'accès est correct
+import 'package:provider/provider.dart';
+import 'package:safesiteconnect/navigation/route.dart';
+
+import '../../ViewsModels/auth_viewmodel.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -38,27 +41,124 @@ class SignInScreenState extends State<SignInScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: SizedBox(
-        height: MediaQuery.of(context).size.height,
-        width: MediaQuery.of(context).size.width,
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF005B96),
-                Color(0xFFE8F5E8),
-                Color(0xFFF0F0F0),
-              ],
-              stops: [0.0, 0.5, 1.0],
+  Future<void> _handleLogin() async {
+    if (_formKey.currentState!.validate()) {
+      final viewModel = Provider.of<AuthViewModel>(context, listen: false);
+
+      // Afficher un snackbar de chargement
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              SizedBox(width: 16),
+              Text('Connexion en cours...'),
+            ],
+          ),
+          backgroundColor: Color(0xFF7ED957),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Appeler le service de login
+      await viewModel.login(_emailController.text, _passwordController.text);
+
+      // Fermer le snackbar de chargement
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+      // Vérifier s'il y a une erreur
+      if (viewModel.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(viewModel.errorMessage!),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'OK',
+              textColor: Colors.white,
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                viewModel.clearError();
+              },
             ),
           ),
-          child: SafeArea(
+        );
+        return;
+      }
+
+      // Navigation basée sur le rôle
+      if (viewModel.user != null) {
+        final role = viewModel.user!.role.toLowerCase();
+
+        // Succès de connexion - afficher message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Bienvenue ${viewModel.user!.nom} !'),
+            backgroundColor: Color(0xFF7ED957),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // Délai pour une meilleure UX
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        if (mounted) {
+          switch (role) {
+            case 'admin':
+              Navigator.pushReplacementNamed(context, AppRoutes.adminDashboard);
+              break;
+            case 'employee':
+              Navigator.pushReplacementNamed(context, AppRoutes.home);
+              break;
+            default:
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Rôle non reconnu. Contactez l\'administrateur.'),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+          }
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors de la connexion'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authViewModel = Provider.of<AuthViewModel>(context);
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: Stack(
+        children: [
+          // Background gradient
+          Container(
+            height: MediaQuery.of(context).size.height,
+            width: MediaQuery.of(context).size.width,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xFF005B96),
+                  Color(0xFFE8F5E8),
+                  Color(0xFFF0F0F0),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+
+          // Content
+          SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: SingleChildScrollView(
@@ -69,14 +169,41 @@ class SignInScreenState extends State<SignInScreen> {
                     const SizedBox(height: 30),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 400),
-                      child: _buildForm(context),
+                      child: _buildForm(context, authViewModel),
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
-        ),
+
+          // Loading overlay
+          if (authViewModel.isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.6),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      color: Color(0xFF7ED957),
+                      strokeWidth: 4,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Connexion en cours...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -131,9 +258,9 @@ class SignInScreenState extends State<SignInScreen> {
         ),
         const SizedBox(height: 20),
         Text(
-          'Login',
+          'SafeSiteConnect',
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 28,
             fontWeight: FontWeight.bold,
             color: Colors.white,
             letterSpacing: 1.2,
@@ -159,9 +286,9 @@ class SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  Widget _buildForm(BuildContext context) {
+  Widget _buildForm(BuildContext context, AuthViewModel viewModel) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
@@ -183,15 +310,19 @@ class SignInScreenState extends State<SignInScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Email Field
             _buildEmailField(),
             const SizedBox(height: 16),
+
+            // Password Field
             _buildPasswordField(),
             const SizedBox(height: 12),
+
+            // Forgot Password
             Align(
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: () {
-                  // Utilise la route nommée pour ForgotPasswordScreen
                   Navigator.pushNamed(context, AppRoutes.forgotPassword);
                 },
                 child: Text(
@@ -204,32 +335,17 @@ class SignInScreenState extends State<SignInScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Login Button
+            _buildSignInButton(viewModel),
+
             const SizedBox(height: 20),
-            _buildSignInButton(),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () {
-                  // Utilise la route nommée pour AdminDashboard
-                  Navigator.pushNamed(context, AppRoutes.adminDashboard);
-                },
-                child: Text(
-                  'Accéder à l\'espace admin',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
             _buildDivider(),
-            const SizedBox(height: 16),
-            _buildGoogleSignInButton(),
-            const SizedBox(height: 16),
-            _buildCreateAccountButton(),
+            const SizedBox(height: 20),
+
+            // Create Account Button
+            _buildCreateAccountButton(context),
           ],
         ),
       ),
@@ -296,16 +412,16 @@ class SignInScreenState extends State<SignInScreen> {
           ),
           filled: true,
           fillColor: Colors.transparent,
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
         keyboardType: TextInputType.emailAddress,
+        textInputAction: TextInputAction.next,
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Veuillez entrer un email';
           }
           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-            return 'Email invalide';
+            return 'Format d\'email invalide';
           }
           return null;
         },
@@ -317,7 +433,7 @@ class SignInScreenState extends State<SignInScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: Colors.white.withOpacity(0.3),
           width: 1,
@@ -347,7 +463,7 @@ class SignInScreenState extends State<SignInScreen> {
           prefixIcon: Container(
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF7ED957).withOpacity(0.2),
+              color: const Color(0xFF005B96).withOpacity(0.2),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
@@ -389,9 +505,14 @@ class SignInScreenState extends State<SignInScreen> {
           const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         ),
         obscureText: !_isPasswordVisible,
+        textInputAction: TextInputAction.done,
+        onFieldSubmitted: (_) => _handleLogin(),
         validator: (value) {
           if (value == null || value.isEmpty) {
             return 'Veuillez entrer un mot de passe';
+          }
+          if (value.length < 6) {
+            return 'Le mot de passe doit contenir au moins 6 caractères';
           }
           return null;
         },
@@ -399,11 +520,13 @@ class SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  Widget _buildSignInButton() {
+  Widget _buildSignInButton(AuthViewModel viewModel) {
+    final isEnabled = _isButtonEnabled && !viewModel.isLoading;
+
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        gradient: _isButtonEnabled
+        gradient: isEnabled
             ? const LinearGradient(
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
@@ -421,7 +544,7 @@ class SignInScreenState extends State<SignInScreen> {
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: _isButtonEnabled
+        boxShadow: isEnabled
             ? [
           BoxShadow(
             color: const Color(0xFF7ED957).withOpacity(0.3),
@@ -432,15 +555,7 @@ class SignInScreenState extends State<SignInScreen> {
             : null,
       ),
       child: ElevatedButton(
-        onPressed: _isButtonEnabled
-            ? () {
-          if (_formKey.currentState!.validate()) {
-            // Action de connexion (futur : appel API)
-            // Navigue vers HomeScreen en utilisant la route nommée
-            Navigator.pushReplacementNamed(context, AppRoutes.home);
-          }
-        }
-            : null,
+        onPressed: isEnabled ? _handleLogin : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           foregroundColor: Colors.white,
@@ -449,7 +564,16 @@ class SignInScreenState extends State<SignInScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: const Text(
+        child: viewModel.isLoading
+            ? const SizedBox(
+          height: 20,
+          width: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
+            : const Text(
           'Se connecter',
           style: TextStyle(
             fontSize: 16,
@@ -491,60 +615,7 @@ class SignInScreenState extends State<SignInScreen> {
     );
   }
 
-  Widget _buildGoogleSignInButton() {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: ElevatedButton.icon(
-        onPressed: () {
-          // Action de connexion Google (à implémenter)
-        },
-        icon: Image.network(
-          'https://developers.google.com/identity/images/g-logo.png',
-          width: 20,
-          height: 20,
-          errorBuilder: (context, error, stackTrace) {
-            return const Icon(
-              Icons.g_mobiledata,
-              size: 24,
-              color: Colors.red,
-            );
-          },
-        ),
-        label: const Text(
-          'Continuer avec Google',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF333333),
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCreateAccountButton() {
+  Widget _buildCreateAccountButton(BuildContext context) {
     return Container(
       height: 50,
       decoration: BoxDecoration(
@@ -563,7 +634,6 @@ class SignInScreenState extends State<SignInScreen> {
       ),
       child: TextButton(
         onPressed: () {
-          // Utilise la route nommée pour SignUpScreen
           Navigator.pushNamed(context, AppRoutes.signUp);
         },
         style: TextButton.styleFrom(
